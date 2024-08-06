@@ -20,27 +20,28 @@ public class PGPKeyPairGenerator {
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    public static void main(String[] args) throws Exception {
-        PGPKeyPair pgpKeyPair = generatePGPKeyPair();
-        SecretKey aesKey = generateAESKey();
+    public static void main(String[] args) {
+        try {
+            PGPKeyPair pgpKeyPair = generatePGPKeyPair();
+            SecretKey aesKey = generateAESKey();
 
-        // Export and print the PGP keys
-        String publicKey = exportPublicKey(pgpKeyPair.getPublicKey());
-        String privateKey = exportPrivateKey(pgpKeyPair);
+            // Export the PGP keys
+            String publicKey = exportPublicKey(pgpKeyPair.getPublicKey());
+            String privateKey = exportPrivateKey(pgpKeyPair);
 
-        System.out.println("PGP Public Key:");
-        System.out.println(publicKey);
-        System.out.println("PGP Private Key:");
-        System.out.println(privateKey);
+            // Save keys to files in the "keys" directory
+            saveKeyToFile("keys/publicKey.asc", publicKey);
+            saveKeyToFile("keys/privateKey.asc", privateKey);
 
-        // Export and print the AES key
-        String aesKeyString = exportAESKey(aesKey);
-        System.out.println("AES Key:");
-        System.out.println(aesKeyString);
+            // Optionally, export AES key if needed
+            String aesKeyString = exportAESKey(aesKey);
+            saveKeyToFile("keys/aesKey.txt", aesKeyString);
 
-        // Save keys to files in the "keys" directory
-        saveKeyToFile("keys/publicKey.asc", publicKey);
-        saveKeyToFile("keys/privateKey.asc", privateKey);
+            System.out.println("Keys have been generated and saved successfully.");
+        } catch (Exception e) {
+            System.err.println("An error occurred: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public static PGPKeyPair generatePGPKeyPair() throws Exception {

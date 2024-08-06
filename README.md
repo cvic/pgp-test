@@ -4,10 +4,10 @@
 mvn clean install
 ```
 
-### Run the main class
+### Run the app
 
 ```
-mvn exec:java -Dexec.mainClass="com.example.encryption.PGPKeyPairGenerator"
+java -jar target/pgp-aes-key-generator-1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
 
