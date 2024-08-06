@@ -11,13 +11,23 @@ import javax.crypto.SecretKey;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.*;
 import java.util.Date;
+import java.util.Properties;
 
 public class PGPKeyPairGenerator {
+    private static String rsaAlgorithm;
+    private static int rsaKeySize;
+    private static String aesAlgorithm;
+    private static int aesKeySize;
+    private static String password;
+    private static Date keyExpirationDate;
+
     static {
         Security.addProvider(new BouncyCastleProvider());
+        loadConfig();
     }
 
     public static void main(String[] args) {
@@ -33,7 +43,7 @@ public class PGPKeyPairGenerator {
             saveKeyToFile("keys/publicKey.asc", publicKey);
             saveKeyToFile("keys/privateKey.asc", privateKey);
 
-            // Optionally, export AES key if needed
+            // Export AES key if needed
             String aesKeyString = exportAESKey(aesKey);
             saveKeyToFile("keys/aesKey.txt", aesKeyString);
 
@@ -44,17 +54,44 @@ public class PGPKeyPairGenerator {
         }
     }
 
+    private static void loadConfig() {
+        Properties properties = new Properties();
+        try (InputStream input = PGPKeyPairGenerator.class.getClassLoader().getResourceAsStream("encryption-config.properties")) {
+            if (input == null) {
+                System.out.println("Sorry, unable to find encryption-config.properties");
+                return;
+            }
+            properties.load(input);
+
+            rsaAlgorithm = properties.getProperty("rsa.algorithm", "RSA");
+            rsaKeySize = Integer.parseInt(properties.getProperty("rsa.keysize", "2048"));
+            aesAlgorithm = properties.getProperty("aes.algorithm", "AES");
+            aesKeySize = Integer.parseInt(properties.getProperty("aes.keysize", "256"));
+            password = properties.getProperty("encryption.password", "mySecretPassword");
+            String expirationDateStr = properties.getProperty("key.expiration.date", "2025-12-31"); // default expiration date
+            keyExpirationDate = java.sql.Date.valueOf(expirationDateStr);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
     public static PGPKeyPair generatePGPKeyPair() throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA", "BC");
-        kpg.initialize(2048);
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance(rsaAlgorithm, "BC");
+        kpg.initialize(rsaKeySize);
         KeyPair kp = kpg.generateKeyPair();
 
-        return new JcaPGPKeyPair(PGPPublicKey.RSA_GENERAL, kp, new Date());
+        // Create PGP key pair
+        PGPKeyPair pgpKeyPair = new JcaPGPKeyPair(PGPPublicKey.RSA_GENERAL, kp, new Date());
+
+        // Note: Key expiration is not directly supported in this way with Bouncy Castle.
+        // You can manage expiration manually or use other mechanisms.
+
+        return pgpKeyPair;
     }
 
     public static SecretKey generateAESKey() throws Exception {
-        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-        keyGen.init(256); // AES-256
+        KeyGenerator keyGen = KeyGenerator.getInstance(aesAlgorithm);
+        keyGen.init(aesKeySize);
         return keyGen.generateKey();
     }
 
@@ -76,7 +113,7 @@ public class PGPKeyPairGenerator {
                 null,
                 new JcaPGPContentSignerBuilder(keyPair.getPublicKey().getAlgorithm(), PGPUtil.SHA256),
                 new JcePBESecretKeyEncryptorBuilder(PGPEncryptedData.AES_256, new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA256))
-                        .build("password".toCharArray())
+                        .build(password.toCharArray())
         );
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -100,7 +137,7 @@ public class PGPKeyPairGenerator {
 
     private static void saveKeyToFile(String filename, String key) throws Exception {
         File file = new File(filename);
-        file.getParentFile().mkdirs(); // Create directories if they do not exist
+        file.getParentFile().mkdirs();
         try (FileOutputStream fos = new FileOutputStream(file)) {
             fos.write(key.getBytes());
         }
